@@ -10,8 +10,20 @@ from os import path
 import time
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+import logging
+from logging.handlers import RotatingFileHandler
 
 def record_data():
+    setup_logging() 
+
+    # Use the logging system to log messages
+    logging.debug('Debugging information')
+    logging.info('Informational message')
+    logging.warning('Warning: %s', 'Database connection lost')
+    logging.error('Error occurred')
+    logging.critical('Critical error -- shutting down')
+
+
     # some constants
     MAX_VAL = 32767 #16 bit int max for scaling
     WINDOW_SIZE_IN_SEC = 10 # a sliding window to use for processing data
@@ -23,7 +35,7 @@ def record_data():
     # Set up audio input
     audio_card_id = os.environ.get('USB_AUDIO_CARD_ID', 2) # default to card 2
     input_device = f'hw:{audio_card_id},0' #TO DO: need to set this programatically depending on which card USB audio ends up (see .bashrc).
-    print(input_device)
+    logging.info(input_device)
     input_channels = 1
     input_rate = 44100
     input_format = alsaaudio.PCM_FORMAT_S16_LE
@@ -61,7 +73,7 @@ def record_data():
             new_portion[i,:] = np.frombuffer(data, dtype=np.int16)
             frames_list.append(data)          
 
-        print(f'Window {win_num}    Process Frame Counter {process_frame_counter}')
+        logging.debug(f'Window {win_num}    Process Frame Counter {process_frame_counter}')
 
         frames = new_portion.ravel()
 
@@ -94,12 +106,12 @@ def record_data():
                 norm_factor = std_a * std_b * len(a)
                 corr_start_time = time.time()
                 corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
-                print(f'Corr exec time: {time.time() - corr_start_time:0.4f}')
+                logging.debug(f'Corr exec time: {time.time() - corr_start_time:0.4f}')
 
                 # handle detection (only handle first match to save processing time)
                 if corr_max > DETECTION_THRESHOLD:
                     message_text = f'DETECTED {match_names[i]}  {corr_max:0.3f}'
-                    print(message_text)
+                    logging.debug(message_text)
                     notify_by_slack('C0517S2GUBY', os.environ['SLACK_API_TOKEN'], message_text)
                     break
             
@@ -107,7 +119,7 @@ def record_data():
             process_frame_counter = FRAME_PROCESSING_DELAY
             start_countdown = False
         
-        print(f'Processed in {time.time() - start_time}')
+        logging.debug(f'Processed in {time.time() - start_time}')
          
         # set a counter to delay processing if current frame exceeded amplitude threshold
         # this allows some more data into the window for better detections if the sound spans across frames
@@ -175,6 +187,18 @@ def notify_by_slack(channel_id, slack_api_token, message_text):
         print("Message sent: ", response["ts"])
     except SlackApiError as e:
         print("Error sending message: {}".format(e))
+
+
+def setup_logging():
+    # Configure the logging system
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s %(levelname)s %(message)s',
+        handlers=[
+            RotatingFileHandler('/home/pi/Projects/audio_detect/logs/audio_detect.log', maxBytes=1024*1024, backupCount=3),
+            logging.StreamHandler()
+        ]
+    )
 
 
 if __name__ == '__main__':
