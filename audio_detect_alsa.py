@@ -16,14 +16,6 @@ from logging.handlers import RotatingFileHandler
 def record_data():
     setup_logging() 
 
-    # Use the logging system to log messages
-    logging.debug('Debugging information')
-    logging.info('Informational message')
-    logging.warning('Warning: %s', 'Database connection lost')
-    logging.error('Error occurred')
-    logging.critical('Critical error -- shutting down')
-
-
     # some constants
     MAX_VAL = 32767 #16 bit int max for scaling
     WINDOW_SIZE_IN_SEC = 10 # a sliding window to use for processing data
@@ -161,7 +153,7 @@ def read_sound_samples():
     only use the first channel
     """
     MAX_VAL = 32767
-    folder = 'sounds'
+    folder = '/home/pi/Projects/audio_detect/sounds'
     filenames = ['outlook_email_short.wav', 'teams_alert.wav', 'teams_incoming_call_short.wav']
     audio_files = []
     stds = []

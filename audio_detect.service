@@ -4,7 +4,7 @@ After=multi-user.target
 
 [Service]
 Type=idle
-ExecStart=/usr/bin/python3 /home/pi/Projects/audio_detect/audio_detect_alsa.py > /home/pi/Projects/audio_detect/audio_detect.log 2>&1
+ExecStart=/usr/bin/python3 /home/pi/Projects/audio_detect/audio_detect_alsa.py
 Restart=on-failure
 User=pi
 
