@@ -11,8 +11,9 @@ import time
 def record_data():
     # some constants
     MAX_VAL = 32767 #16 bit int max for scaling
-    WINDOW_SIZE_IN_SEC = 5 # a sliding window to use for processing data
+    WINDOW_SIZE_IN_SEC = 10 # a sliding window to use for processing data
     WINDOW_SHIFT_IN_SEC = 1 # slide the window by this amount
+    DETECTION_THRESHOLD = 0.7
 
     # Set up audio input
     input_device = 'hw:2,0' #TO DO: need to set this programatically depending on which card USB audio ends up (see .bashrc).
@@ -20,6 +21,7 @@ def record_data():
     input_rate = 44100
     input_format = alsaaudio.PCM_FORMAT_S16_LE
     input_period_size = 1024
+    num_periods = int(input_rate/input_period_size)
 
     input_stream = alsaaudio.PCM(alsaaudio.PCM_CAPTURE, alsaaudio.PCM_NORMAL, input_device)
     input_stream.setchannels(input_channels)
@@ -36,12 +38,12 @@ def record_data():
         frames.append(data)
     '''
    
-    match_audio, match_audio_names = read_sound_samples()
+    match_audio, match_stds, match_names = read_sound_samples()
 
 
     # Initialize circular buffer
     #buffer_size = input_rate * 10  # buffer size of 10 seconds
-    buffer_size = 43 * 1024 * 10
+    buffer_size = num_periods * input_period_size * WINDOW_SIZE_IN_SEC
     window = np.zeros(buffer_size, dtype=np.int16)
     start = 0  # start index of circular buffer
 
@@ -49,8 +51,8 @@ def record_data():
     frames_list = []
     while win_num < 10:
         # Read data from capture device
-        new_portion = np.zeros((43,1024), dtype=np.int16)
-        for i in range(43): #read one second worth of data
+        new_portion = np.zeros((num_periods,input_period_size), dtype=np.int16)
+        for i in range(num_periods): #read one second worth of data
             length, data = input_stream.read()
             new_portion[i,:] = np.frombuffer(data, dtype=np.int16)
             frames_list.append(data)          
@@ -74,17 +76,29 @@ def record_data():
         win_num += 1
         
         # Process the latest window of data
-        #time.sleep(5)
-        print(match_audio[0].shape)
-        print(window.shape)
-        norm_factor = np.sqrt(np.sum((match_audio[0]/MAX_VAL)**2) * np.sum((window/MAX_VAL)**2))
-        corr_max = np.amax(correlate(match_audio[0], window, mode='same')/norm_factor)
-        print(corr_max)
+        start_time = time.time()
+        #a = match_audio[0].astype(float)/MAX_VAL
+        b = window.astype(float)/MAX_VAL
+        std_b = np.std(b)
+        #norm_factor = np.std(a) * np.std(b) * len(a)
+        #corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
+       
+        # compare window to several possible matches
+        for i in range(len(match_audio)):
+            a = match_audio[i]
+            std_a = match_stds[i]
+            norm_factor = std_a * std_b * len(a)
+            corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
+       
+            if corr_max > DETECTION_THRESHOLD:
+                print(f'DETECTED {match_names[i]}  {corr_max:0.3f}')
 
+        print(f'Processed in {time.time() - start_time}')
     
     filename = 'output' + str('all')
     print('Plotting')
-    plot_window(new_portion.ravel()/MAX_VAL, filename)
+    plot_window(b, filename)
+    plot_window(a, 'match')
     print('Saving wav')
     save_wav(frames_list, filename, input_channels, input_rate)
     
@@ -111,14 +125,19 @@ def read_sound_samples():
     """ read in the samples used for matching and return them as a tuple 
     only use the first channel
     """
+    MAX_VAL = 32767
     folder = 'sounds'
     filenames = ['outlook_email.wav', 'teams_alert.wav', 'teams_incoming_call.wav']
     audio_files = []
+    stds = []
     for filename in filenames:
         fs, data = wavfile.read(path.join(folder, filename), 'rb')
-        audio_files.append(data[:,0])
+        print('fs: ', fs)
+        data_float = data[:,0].astype(float)/MAX_VAL
+        audio_files.append(data_float)
+        stds.append(np.std(data_float))
 
-    return audio_files, filenames
+    return audio_files, stds, filenames
 
 
 if __name__ == '__main__':
