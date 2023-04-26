@@ -21,7 +21,9 @@ def record_data():
     FRAME_PROCESSING_DELAY = 2 # number of frames to keep reading after amplitude detection before processing the window
 
     # Set up audio input
-    input_device = 'hw:2,0' #TO DO: need to set this programatically depending on which card USB audio ends up (see .bashrc).
+    audio_card_id = os.environ.get('USB_AUDIO_CARD_ID', 2) # default to card 2
+    input_device = f'hw:{audio_card_id},0' #TO DO: need to set this programatically depending on which card USB audio ends up (see .bashrc).
+    print(input_device)
     input_channels = 1
     input_rate = 44100
     input_format = alsaaudio.PCM_FORMAT_S16_LE
