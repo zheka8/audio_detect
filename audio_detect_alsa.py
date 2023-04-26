@@ -30,17 +30,7 @@ def record_data():
     input_stream.setformat(input_format)
     input_stream.setperiodsize(input_period_size)
 
-    # Record audio
-    '''
-    frames = []
-    for i in range(0, int(input_rate / input_period_size * 10)):
-        # Read data from the input stream
-        data_length, data = input_stream.read() # returns a tuple (size, bytes)
-        frames.append(data)
-    '''
-   
     match_audio, match_stds, match_names = read_sound_samples()
-
 
     # Initialize circular buffer
     #buffer_size = input_rate * 10  # buffer size of 10 seconds
@@ -90,10 +80,14 @@ def record_data():
                 a = match_audio[i]
                 std_a = match_stds[i]
                 norm_factor = std_a * std_b * len(a)
+                corr_start_time = time.time()
                 corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
-       
+                print(f'Corr exec time: {time.time() - corr_start_time:0.4f}')
+
+                # handle detection (only handle first match to save processing time
                 if corr_max > DETECTION_THRESHOLD:
                     print(f'DETECTED {match_names[i]}  {corr_max:0.3f}')
+                    break
 
         print(f'Processed in {time.time() - start_time}')
     
@@ -129,7 +123,7 @@ def read_sound_samples():
     """
     MAX_VAL = 32767
     folder = 'sounds'
-    filenames = ['outlook_email.wav', 'teams_alert.wav', 'teams_incoming_call.wav']
+    filenames = ['outlook_email.wav', 'teams_alert.wav', 'teams_incoming_call_short.wav']
     audio_files = []
     stds = []
     for filename in filenames:
