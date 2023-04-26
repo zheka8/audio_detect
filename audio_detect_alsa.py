@@ -5,8 +5,11 @@ import numpy as np
 from scipy.signal import correlate
 from scipy.io import wavfile
 import matplotlib.pyplot as plt
+import os
 from os import path
 import time
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 def record_data():
     # some constants
@@ -69,8 +72,9 @@ def record_data():
         # Process the latest window of data if magnitude is above threshold
         start_time = time.time()
         #a = match_audio[0].astype(float)/MAX_VAL
-        b = window.astype(float)/MAX_VAL
-        if  np.amax(np.abs(new_portion)) > MAG_THRESHOLD:
+        b = window.astype(float)/MAX_VAL        
+        
+        if process_frame:
             std_b = np.std(b)
             #norm_factor = np.std(a) * np.std(b) * len(a)
             #corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
@@ -86,10 +90,18 @@ def record_data():
 
                 # handle detection (only handle first match to save processing time
                 if corr_max > DETECTION_THRESHOLD:
-                    print(f'DETECTED {match_names[i]}  {corr_max:0.3f}')
+                    message_text = f'DETECTED {match_names[i]}  {corr_max:0.3f}'
+                    print(message_text)
+                    notify_by_slack('C0517S2GUBY', os.environ['SLACK_API_TOKEN'], message_text)
                     break
 
+            process_frame = False
         print(f'Processed in {time.time() - start_time}')
+         
+        # set a flag to process the next frame if the current frame exceeded amplitude threshold
+        # this allows some more data into the window for better detections
+        if np.amax(np.abs(new_portion)) > MAG_THRESHOLD:
+            process_frame = True
     
     filename = 'output' + str('all')
     print('Plotting')
@@ -134,6 +146,20 @@ def read_sound_samples():
         stds.append(np.std(data_float))
 
     return audio_files, stds, filenames
+
+def notify_by_slack(channel_id, slack_api_token, message_text):
+    # Set the text of the message you want to send
+    client = WebClient(token=slack_api_token)
+
+    try:
+        # Call the chat.postMessage method using the WebClient
+        response = client.chat_postMessage(
+            channel=channel_id,
+            text=message_text
+        )
+        print("Message sent: ", response["ts"])
+    except SlackApiError as e:
+        print("Error sending message: {}".format(e))
 
 
 if __name__ == '__main__':
