@@ -18,6 +18,7 @@ def record_data():
     WINDOW_SHIFT_IN_SEC = 1 # slide the window by this amount
     DETECTION_THRESHOLD = 0.7
     MAG_THRESHOLD = 0.05 * MAX_VAL    # amplitude threshold for initiating processing of each window
+    FRAME_PROCESSING_DELAY = 2 # number of frames to keep reading after amplitude detection before processing the window
 
     # Set up audio input
     input_device = 'hw:2,0' #TO DO: need to set this programatically depending on which card USB audio ends up (see .bashrc).
@@ -43,17 +44,23 @@ def record_data():
 
     win_num = 0
     frames_list = []
-    while win_num < 40:
+    process_frame_counter = FRAME_PROCESSING_DELAY
+    start_countdown = False
+    while win_num < 40000:
         # Read data from capture device
         new_portion = np.zeros((num_periods,input_period_size), dtype=np.int16)
         for i in range(num_periods): #read one second worth of data
             length, data = input_stream.read()
+            
+            # skip this frame if something went wrong and there's nothing captured
+            if length != input_period_size:
+                continue
+
             new_portion[i,:] = np.frombuffer(data, dtype=np.int16)
             frames_list.append(data)          
 
-        print(win_num)
+        print(f'Window {win_num}    Process Frame Counter {process_frame_counter}')
 
-        #frames = np.frombuffer(data, dtype=np.int16)
         frames = new_portion.ravel()
 
         # Add frames to circular buffer
@@ -71,13 +78,12 @@ def record_data():
         
         # Process the latest window of data if magnitude is above threshold
         start_time = time.time()
-        #a = match_audio[0].astype(float)/MAX_VAL
-        b = window.astype(float)/MAX_VAL        
         
-        if process_frame:
+        # only perform processing if the counter hits zero
+        if process_frame_counter <= 0:
+            # current window audio
+            b = window.astype(float)/MAX_VAL        
             std_b = np.std(b)
-            #norm_factor = np.std(a) * np.std(b) * len(a)
-            #corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
        
             # compare window to several possible matches
             for i in range(len(match_audio)):
@@ -88,27 +94,34 @@ def record_data():
                 corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
                 print(f'Corr exec time: {time.time() - corr_start_time:0.4f}')
 
-                # handle detection (only handle first match to save processing time
+                # handle detection (only handle first match to save processing time)
                 if corr_max > DETECTION_THRESHOLD:
                     message_text = f'DETECTED {match_names[i]}  {corr_max:0.3f}'
                     print(message_text)
                     notify_by_slack('C0517S2GUBY', os.environ['SLACK_API_TOKEN'], message_text)
                     break
-
-            process_frame = False
+            
+            # reset processing flag
+            process_frame_counter = FRAME_PROCESSING_DELAY
+            start_countdown = False
+        
         print(f'Processed in {time.time() - start_time}')
          
-        # set a flag to process the next frame if the current frame exceeded amplitude threshold
-        # this allows some more data into the window for better detections
+        # set a counter to delay processing if current frame exceeded amplitude threshold
+        # this allows some more data into the window for better detections if the sound spans across frames
         if np.amax(np.abs(new_portion)) > MAG_THRESHOLD:
-            process_frame = True
+            process_frame_counter = FRAME_PROCESSING_DELAY
+            start_countdown = True
+        
+        if start_countdown:
+            process_frame_counter -= 1
     
-    filename = 'output' + str('all')
-    print('Plotting')
-    plot_window(b, filename)
-    plot_window(a, 'match')
-    print('Saving wav')
-    save_wav(frames_list, filename, input_channels, input_rate)
+    #filename = 'output' + str('all')
+    #print('Plotting')
+    #plot_window(b, filename)
+    #plot_window(a, 'match')
+    #print('Saving wav')
+    #save_wav(frames_list, filename, input_channels, input_rate)
     
     # Clean up
     input_stream.close()
@@ -135,7 +148,7 @@ def read_sound_samples():
     """
     MAX_VAL = 32767
     folder = 'sounds'
-    filenames = ['outlook_email.wav', 'teams_alert.wav', 'teams_incoming_call_short.wav']
+    filenames = ['outlook_email_short.wav', 'teams_alert.wav', 'teams_incoming_call_short.wav']
     audio_files = []
     stds = []
     for filename in filenames:
