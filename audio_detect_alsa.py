@@ -14,6 +14,7 @@ def record_data():
     WINDOW_SIZE_IN_SEC = 10 # a sliding window to use for processing data
     WINDOW_SHIFT_IN_SEC = 1 # slide the window by this amount
     DETECTION_THRESHOLD = 0.7
+    MAG_THRESHOLD = 0.05 * MAX_VAL    # amplitude threshold for initiating processing of each window
 
     # Set up audio input
     input_device = 'hw:2,0' #TO DO: need to set this programatically depending on which card USB audio ends up (see .bashrc).
@@ -49,7 +50,7 @@ def record_data():
 
     win_num = 0
     frames_list = []
-    while win_num < 10:
+    while win_num < 40:
         # Read data from capture device
         new_portion = np.zeros((num_periods,input_period_size), dtype=np.int16)
         for i in range(num_periods): #read one second worth of data
@@ -75,23 +76,24 @@ def record_data():
 
         win_num += 1
         
-        # Process the latest window of data
+        # Process the latest window of data if magnitude is above threshold
         start_time = time.time()
         #a = match_audio[0].astype(float)/MAX_VAL
         b = window.astype(float)/MAX_VAL
-        std_b = np.std(b)
-        #norm_factor = np.std(a) * np.std(b) * len(a)
-        #corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
+        if  np.amax(np.abs(new_portion)) > MAG_THRESHOLD:
+            std_b = np.std(b)
+            #norm_factor = np.std(a) * np.std(b) * len(a)
+            #corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
        
-        # compare window to several possible matches
-        for i in range(len(match_audio)):
-            a = match_audio[i]
-            std_a = match_stds[i]
-            norm_factor = std_a * std_b * len(a)
-            corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
+            # compare window to several possible matches
+            for i in range(len(match_audio)):
+                a = match_audio[i]
+                std_a = match_stds[i]
+                norm_factor = std_a * std_b * len(a)
+                corr_max = np.amax(correlate(a, b, mode='valid')/norm_factor)
        
-            if corr_max > DETECTION_THRESHOLD:
-                print(f'DETECTED {match_names[i]}  {corr_max:0.3f}')
+                if corr_max > DETECTION_THRESHOLD:
+                    print(f'DETECTED {match_names[i]}  {corr_max:0.3f}')
 
         print(f'Processed in {time.time() - start_time}')
     
