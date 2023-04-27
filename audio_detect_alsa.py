@@ -52,7 +52,7 @@ def record_data():
     frames_list = []
     process_frame_counter = FRAME_PROCESSING_DELAY
     start_countdown = False
-    while win_num < 40000:
+    while win_num < 40000 or True:
         # Read data from capture device
         new_portion = np.zeros((num_periods,input_period_size), dtype=np.int16)
         for i in range(num_periods): #read one second worth of data
@@ -103,7 +103,7 @@ def record_data():
                 # handle detection (only handle first match to save processing time)
                 if corr_max > DETECTION_THRESHOLD:
                     message_text = f'DETECTED {match_names[i]}  {corr_max:0.3f}'
-                    logging.debug(message_text)
+                    logging.info(message_text)
                     notify_by_slack('C0517S2GUBY', os.environ['SLACK_API_TOKEN'], message_text)
                     break
             
@@ -159,7 +159,7 @@ def read_sound_samples():
     stds = []
     for filename in filenames:
         fs, data = wavfile.read(path.join(folder, filename), 'rb')
-        print('fs: ', fs)
+        logging.info(f'Reading {filename} fs: {fs}')
         data_float = data[:,0].astype(float)/MAX_VAL
         audio_files.append(data_float)
         stds.append(np.std(data_float))
@@ -176,15 +176,15 @@ def notify_by_slack(channel_id, slack_api_token, message_text):
             channel=channel_id,
             text=message_text
         )
-        print("Message sent: ", response["ts"])
+        logging.info("Message sent: ", response["ts"])
     except SlackApiError as e:
-        print("Error sending message: {}".format(e))
+        logging.info("Error sending message: {}".format(e))
 
 
 def setup_logging():
     # Configure the logging system
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='%(asctime)s %(levelname)s %(message)s',
         handlers=[
             RotatingFileHandler('/home/pi/Projects/audio_detect/logs/audio_detect.log', maxBytes=1024*1024, backupCount=3),

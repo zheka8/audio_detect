@@ -4,9 +4,10 @@ After=multi-user.target
 
 [Service]
 Type=idle
-ExecStart=/usr/bin/python3 /home/pi/Projects/audio_detect/audio_detect_alsa.py
+ExecStart=/home/pi/Projects/audio_detect/service_start.sh
 Restart=on-failure
 User=pi
+EnvironmentFile=/home/pi/.bashrc
 
 [Install]
 WantedBy=multi-user.target
