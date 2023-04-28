@@ -51,10 +51,17 @@ def record_data():
     win_num = 0
     frames_list = []
     process_frame_counter = FRAME_PROCESSING_DELAY
+    new_portion = np.zeros((num_periods,input_period_size), dtype=np.int16)
+    length, data = 0, 0
+    b = np.zeros_like(window)
+    std_b = 0
     start_countdown = False
-    while win_num < 40000 or True:
+
+    # Start the memory trace 
+    # tracemalloc.start()
+
+    while win_num < 40 or True:
         # Read data from capture device
-        new_portion = np.zeros((num_periods,input_period_size), dtype=np.int16)
         for i in range(num_periods): #read one second worth of data
             length, data = input_stream.read()
             
@@ -63,7 +70,7 @@ def record_data():
                 continue
 
             new_portion[i,:] = np.frombuffer(data, dtype=np.int16)
-            frames_list.append(data)          
+            #frames_list.append(data)       # this is a memory leak. use a circular buffer or queue instead   
 
         logging.debug(f'Window {win_num}    Process Frame Counter {process_frame_counter}')
 
@@ -80,8 +87,9 @@ def record_data():
             window[start:end] = frames
             start = end
 
+        logging.debug(f'Window {win_num}')
         win_num += 1
-        
+       
         # Process the latest window of data if magnitude is above threshold
         start_time = time.time()
         
@@ -131,7 +139,17 @@ def record_data():
     
     # Clean up
     input_stream.close()
+   
+    """
+    # Memory profile stats
+    snapshot = tracemalloc.take_snapshot()
+    #print(f"Current memory usage: {current / 10**6}MB")
 
+    top_stats = snapshot.statistics('lineno')
+    print("Top 10 memory-consuming lines:")
+    for stat in top_stats[:10]:
+        print(stat)    
+    """
 
 def save_wav(frames, filename, channels, rate):    
     """ save a list of frames as a wav file """
@@ -194,4 +212,18 @@ def setup_logging():
 
 
 if __name__ == '__main__':
+    #tracemalloc.start()
+
     record_data()
+    '''
+    # Print the current memory usage
+    current, peak = tracemalloc.get_traced_memory()
+    print(f"Current memory usage: {current / 10**6}MB")
+
+    # Stop the trace and print the top 10 memory-consuming lines of code
+    tracemalloc.stop()
+    top_stats = tracemalloc.get_stats()[:10]
+    print("Top 10 memory-consuming lines:")
+    for stat in top_stats:
+        print(stat)
+    '''
