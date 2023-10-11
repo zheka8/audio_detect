@@ -110,7 +110,7 @@ def record_data():
 
                 # handle detection (only handle first match to save processing time)
                 if corr_max > DETECTION_THRESHOLD:
-                    message_text = f'DETECTED {match_names[i]}  {corr_max:0.3f}'
+                    message_text = f'{match_names[i]}'
                     logging.info(message_text)
                     notify_by_slack('C0517S2GUBY', os.environ['SLACK_API_TOKEN'], message_text)
                     break
