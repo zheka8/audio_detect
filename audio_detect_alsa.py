@@ -190,7 +190,11 @@ def notify_by_slack(channel_id, slack_api_token, message_text):
     # Set the text of the message you want to send
     client = WebClient(token=slack_api_token)
 
-    image_path = take_screenshot()    
+    image_path = take_screenshot()
+
+    # use a placeholder image to prevent slack API from failing in case the screenshot failed
+    if not image_path:
+        image_path = '/home/pi/Projects/audio_detect/placeholder.jpeg'
 
     try:
         # Upload an image
@@ -200,23 +204,7 @@ def notify_by_slack(channel_id, slack_api_token, message_text):
             title = message_text,
             initial_comment = message_text            
         )
-        logging.info(f'Message sent: {response["ts"]}')
-
-        '''
-        # Call the chat.postMessage method using the WebClient
-        response = client.chat_postMessage(
-            channel=channel_id,
-            text=message_text,
-            attachments=[
-                {
-                    "fallback": "Image could not be displayed",
-                    "image_url": image_path,
-                    "text": "" #optional description
-                }
-            ]
-        )
-        logging.info(f'Message sent: {response["ts"]}')
-        '''
+        logging.info(f'Message sent')
     except SlackApiError as e:
         logging.info(f'Error sending message: {e}')
 
