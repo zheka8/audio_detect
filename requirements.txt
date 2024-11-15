@@ -1,0 +1,7 @@
+pyalsaaudio==0.11.0
+wave
+numpy
+scipy
+matplotlib
+slack_sdk
+pikvm-lib

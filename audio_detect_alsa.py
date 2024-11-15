@@ -12,7 +12,8 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 import logging
 from logging.handlers import RotatingFileHandler
-#from pikvm_lib import PiKVM
+import requests
+from urllib3.exceptions import InsecureRequestWarning
 
 def record_data():
     setup_logging() 
@@ -189,10 +190,19 @@ def notify_by_slack(channel_id, slack_api_token, message_text):
     # Set the text of the message you want to send
     client = WebClient(token=slack_api_token)
 
-    #image_path = take_screenshot()
-    image_path = ''
+    image_path = take_screenshot()    
 
     try:
+        # Upload an image
+        response = client.files_upload(
+            channels = channel_id,
+            file = image_path,
+            title = message_text,
+            initial_comment = message_text            
+        )
+        logging.info(f'Message sent: {response["ts"]}')
+
+        '''
         # Call the chat.postMessage method using the WebClient
         response = client.chat_postMessage(
             channel=channel_id,
@@ -206,6 +216,7 @@ def notify_by_slack(channel_id, slack_api_token, message_text):
             ]
         )
         logging.info(f'Message sent: {response["ts"]}')
+        '''
     except SlackApiError as e:
         logging.info(f'Error sending message: {e}')
 
@@ -221,21 +232,37 @@ def setup_logging():
         ]
     )
 
-'''
+
 def take_screenshot():
     # Take a screenshot using PiKVM api. Return the path to screenshot of successful, otherwise return None
+
+    hostname = os.getenv('PIKVM_HOSTNAME')
+    username = os.getenv('PIKVM_USER')
+    password = os.getenv('PIKVM_PW')
+
+    streamer_api_url = f'https://{hostname}/api/streamer/snapshot'
+    #info_api_url = f'https://{hostname}/api/info'
 
     snapshot_path = '/home/pi/Projects/audio_detect'
     snapshot_name = 'screenshot.jpeg'
 
+    requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+    logging.info(f'PiKVM API call to {streamer_api_url}')
+
     try:
-        pikvm_instance = PiKVM(hostname=os.getenv('PIKVM_HOSTNAME'), username=os.getenv('PIKVM_USER'), password=os.getenv('PIKVM_PW'))
-        pikvm_instance.get_streamer_snapshot(snapshot_path=snapshot_path, filename=snapshot_name, ocr=False)
-        return os.path.join(snapshot_path, snapshot_name)
+        response = requests.get(streamer_api_url, verify=False, auth=(username, password))
+        if response.status_code == 200:
+            logging.info(f'PiKVM screenshot succeeded with status code {response.status_code}')
+            with open(os.path.join(snapshot_path, snapshot_name), 'wb') as f:
+                f.write(response.content)
+                return os.path.join(snapshot_path, snapshot_name)
+        else:
+            logging.info(f'PiKVM screenshot failed with status code {response.status_code}')
+            return ''
     except Exception as e:
         logging.info(f'PiKVM screenshot attempted and caught exception {e}')
         return ''
-'''
+
 
 if __name__ == '__main__':
     #tracemalloc.start()
